@@ -1,0 +1,33 @@
+{
+  "name": "stats-worker",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "dev": "ts-node src/main.ts",
+    "build": "rm -rf dist && tsc",
+    "start": "node dist/src/main.js",
+    "test": "jest --config ./spec/test.config.json"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/jest": "^27.0.1",
+    "@types/node": "^16.6.1",
+    "@types/seedrandom": "^3.0.1",
+    "@types/yaml": "^1.9.7",
+    "@waves/ts-lib-crypto": "^1.4.4-beta.1",
+    "jest": "^27.0.6",
+    "mongodb-memory-server": "^7.3.6",
+    "seedrandom": "^3.0.5",
+    "ts-jest": "^27.0.4",
+    "typescript": "^4.3.5"
+  },
+  "dependencies": {
+    "joi": "^17.4.2",
+    "mongodb": "^4.1.0",
+    "simple-node-logger": "^21.8.12",
+    "yaml": "^1.10.2"
+  }
+}
