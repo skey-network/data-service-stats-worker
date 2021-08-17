@@ -1,54 +1,50 @@
-import { MongoClient } from 'mongodb'
-import { Config, loadConfig } from './config'
-import { countCollection } from './count'
-import { connect, disconnect } from './db'
 import { resolveSuppliers } from './resolvers/suppliers'
+import { resolveOrganisations } from './resolvers/organisations'
+import { resolveKeys } from './resolvers/keys'
+import { resolveDevices } from './resolvers/devices'
+import { ResolverContext } from './resolvers/common'
+import { connect, disconnect, getCollections } from './db'
+import { config } from './config'
+import { x } from 'joi'
+import { UpdateOneModel } from 'mongodb'
 
-// export interface CollectionResult {
-//   collection: string
-//   all: number
-//   groups: {
-//     field: string
-//     value: any
-//     count: number
-//   }[]
-// }
+const resolveAll = async (ctx: ResolverContext) => {
+  const [suppliers, organisations, keys, devices] = await Promise.all([
+    resolveSuppliers(ctx),
+    resolveOrganisations(ctx),
+    resolveKeys(ctx),
+    resolveDevices(ctx)
+  ])
 
-// export const countAllCollections = async (
-//   client: MongoClient,
-//   config: Config
-// ) => {
-//   const results: CollectionResult[] = []
-
-//   for (const collectionConfig of config.collections) {
-//     const collection = client.db().collection(collectionConfig.name)
-
-//     const result = await countCollection(
-//       collection,
-//       config.collections[0].groups ?? []
-//     )
-
-//     results.push({ collection: collectionConfig.name, ...result })
-//   }
-
-//   return results
-// }
-
-const main = async () => {
-  const config = loadConfig()
-
-  if (!config) {
-    console.error('failed to load config')
-    process.exit(1)
-  }
-
-  const client = await connect(config.db)
-
-  // const results = await resolveSuppliers(client.db())
-  // console.log(results)
-
-  await disconnect(client)
-  process.exit(0)
+  return { suppliers, organisations, keys, devices }
 }
 
-main()
+const main = async () => {
+  const client = await connect(config.db)
+  const collections = getCollections(client)
+
+  const obj = await resolveAll({ collections })
+  const parsed = Object.entries(obj)
+    .map(([key, value]) =>
+      value.map((item: any) => ({
+        id: item.id,
+        current: { timestamp: item.timestamp, data: item.data },
+        type: key
+      }))
+    )
+    .flat()
+
+  const updates: { updateOne: UpdateOneModel }[] = parsed.map((x) => ({
+    updateOne: { update: { $set: x }, upsert: true, filter: { id: x.id } }
+  }))
+  
+  console.log(updates.length)
+  console.log('start')
+  await client.db().collection('stats').bulkWrite(updates)
+
+  console.log('end')
+
+  await disconnect(client)
+}
+
+main().then(() => process.exit(0))

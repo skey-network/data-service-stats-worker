@@ -1,20 +1,7 @@
-import { readFileSync } from 'fs'
-import Joi from 'joi'
-import YAML from 'yaml'
+const { env } = process
 
 export interface Config {
-  collections: CollectionConfig[]
   db: DatabaseConfig
-}
-
-export interface CollectionConfig {
-  name: string
-  groups?: GroupConfig[]
-}
-
-export interface GroupConfig {
-  field: string
-  value: any
 }
 
 export interface DatabaseConfig {
@@ -25,50 +12,12 @@ export interface DatabaseConfig {
   password: string
 }
 
-export const configSchema = Joi.object({
-  collections: Joi.array()
-    .required()
-    .items(
-      Joi.object({
-        name: Joi.string().required(),
-        groups: Joi.array()
-          .optional()
-          .items(
-            Joi.object({
-              field: Joi.string().required(),
-              value: Joi.any()
-            })
-          )
-      })
-    ),
-  db: Joi.object({
-    host: Joi.string().required(),
-    port: Joi.number().required(),
-    name: Joi.string().required(),
-    username: Joi.string().required(),
-    password: Joi.string().required()
-  })
-})
-
-export const CONFIG_PATH = './config.yml'
-
-export const loadConfig = (): Config | null => {
-  try {
-    const text = readFileSync(CONFIG_PATH, 'utf-8')
-    const obj = YAML.parse(text)
-    const validation = configSchema.validate(obj)
-
-    if (validation.error) {
-      console.error(validation.error)
-    }
-
-    if (validation.warning) {
-      console.error(validation.warning)
-    }
-
-    return validation.error ? null : obj
-  } catch (err) {
-    console.error(err)
-    return null
+export const config: Config = {
+  db: {
+    name: env.DB_NAME ?? 'admin',
+    host: env.DB_HOST ?? 'localhost',
+    port: Number(env.DB_PORT ?? '27017'),
+    username: env.DB_USERNAME ?? 'root',
+    password: env.DB_PASSWORD ?? 'password'
   }
 }

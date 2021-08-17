@@ -5,26 +5,25 @@ import {
   ResolverContext
 } from './common'
 
-export const resolveSuppliers: Resolver = async (ctx) => {
-  const suppliers = await ctx.collections.suppliers.find().toArray()
+export const resolveOrganisations: Resolver = async (ctx) => {
+  const organisations = await ctx.collections.organisations.find().toArray()
 
   return await Promise.all(
-    suppliers.map(async (supplier) => {
-      const [devices, keys, events, organisations] = await Promise.all([
-        countDevices(ctx, supplier.address),
-        countKeys(ctx, supplier.address),
-        countEvents(ctx, supplier.address),
-        countOrganisations(ctx, supplier.address)
+    organisations.map(async (org) => {
+      const [devices, keys, users] = await Promise.all([
+        countDevices(ctx, org.address),
+        countKeys(ctx, org.address),
+        countUsers(ctx, org.address)
+        // countEvents(ctx, org.address)
       ])
 
       return {
-        id: supplier.address,
+        id: org.address,
         timestamp: Date.now(),
         data: {
           devices,
           keys,
-          events,
-          organisations
+          users
         }
       }
     })
@@ -33,26 +32,18 @@ export const resolveSuppliers: Resolver = async (ctx) => {
 
 export const countDevices = async (ctx: ResolverContext, address: string) => {
   const pipeline = [
-    { $match: { supplier: address } },
-    {
-      $facet: createGroupPipeline([
-        { field: 'active', value: true },
-        { field: 'active', value: false },
-        { field: 'connected', value: true },
-        { field: 'connected', value: false },
-        { field: 'visible', value: true },
-        { field: 'visible', value: false }
-      ])
-    }
+    { $match: { owner: address } },
+    { $group: { _id: '$device' } },
+    { $count: 'count' }
   ]
 
-  const [obj] = await ctx.collections.devices.aggregate(pipeline).toArray()
-  return extractCounts(obj)
+  const [doc] = await ctx.collections.keys.aggregate(pipeline).toArray()
+  return { all: doc?.count ?? 0 }
 }
 
 export const countKeys = async (ctx: ResolverContext, address: string) => {
   const pipeline = [
-    { $match: { issuer: address } },
+    { $match: { owner: address } },
     {
       $facet: createGroupPipeline([
         { field: 'burned', value: true },
@@ -66,6 +57,8 @@ export const countKeys = async (ctx: ResolverContext, address: string) => {
 }
 
 export const countEvents = async (ctx: ResolverContext, address: string) => {
+  // TODO use deviceActionAs organisation parameter
+
   const pipeline = [
     {
       $lookup: {
@@ -75,7 +68,7 @@ export const countEvents = async (ctx: ResolverContext, address: string) => {
         as: 'key'
       }
     },
-    { $match: { 'key.issuer': address } },
+    { $match: { 'key.owner': address } },
     {
       $facet: createGroupPipeline()
     }
@@ -85,18 +78,15 @@ export const countEvents = async (ctx: ResolverContext, address: string) => {
   return extractCounts(obj)
 }
 
-export const countOrganisations = async (
-  ctx: ResolverContext,
-  address: string
-) => {
+export const countUsers = async (ctx: ResolverContext, address: string) => {
   const pipeline = [
     { $match: { address } },
     {
       $project: {
         count: {
           $cond: {
-            if: { $isArray: '$organisations' },
-            then: { $size: '$organisations' },
+            if: { $isArray: '$users' },
+            then: { $size: '$users' },
             else: 0
           }
         }
@@ -104,6 +94,9 @@ export const countOrganisations = async (
     }
   ]
 
-  const [obj] = await ctx.collections.suppliers.aggregate(pipeline).toArray()
+  const [obj] = await ctx.collections.organisations
+    .aggregate(pipeline)
+    .toArray()
+
   return { whitelisted: obj?.count ?? 0 }
 }
