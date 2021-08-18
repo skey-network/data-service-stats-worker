@@ -1,48 +1,14 @@
-import { resolveSuppliers } from './resolvers/suppliers'
-import { resolveOrganisations } from './resolvers/organisations'
-import { resolveKeys } from './resolvers/keys'
-import { resolveDevices } from './resolvers/devices'
-import { ResolverContext } from './resolvers/common'
-import { connect, disconnect, getCollections } from './db'
-import { config } from './config'
-import { x } from 'joi'
-import { UpdateOneModel } from 'mongodb'
-
-const resolveAll = async (ctx: ResolverContext) => {
-  const [suppliers, organisations, keys, devices] = await Promise.all([
-    resolveSuppliers(ctx),
-    resolveOrganisations(ctx),
-    resolveKeys(ctx),
-    resolveDevices(ctx)
-  ])
-
-  return { suppliers, organisations, keys, devices }
-}
+import { connect, disconnect } from './db'
+import { assertConfig, config } from './config'
+import { runUpdate } from './update'
 
 const main = async () => {
-  const client = await connect(config.db)
-  const collections = getCollections(client)
+  assertConfig()
 
-  const obj = await resolveAll({ collections })
-  const parsed = Object.entries(obj)
-    .map(([key, value]) =>
-      value.map((item: any) => ({
-        id: item.id,
-        current: { timestamp: item.timestamp, data: item.data },
-        type: key
-      }))
-    )
-    .flat()
+  const client = await connect(config().db)
 
-  const updates: { updateOne: UpdateOneModel }[] = parsed.map((x) => ({
-    updateOne: { update: { $set: x }, upsert: true, filter: { id: x.id } }
-  }))
-  
-  console.log(updates.length)
-  console.log('start')
-  await client.db().collection('stats').bulkWrite(updates)
-
-  console.log('end')
+  const result = await runUpdate(client, config().app.mode)
+  console.log(result)
 
   await disconnect(client)
 }

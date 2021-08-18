@@ -1,4 +1,4 @@
-import * as pipeline from '../src/pipeline'
+import * as pipeline from './pipeline'
 
 it('createIntervals', () => {
   const expected = [

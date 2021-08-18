@@ -4,7 +4,19 @@ export interface ResolverContext {
   collections: Collections
 }
 
-export type Resolver = (ctx: ResolverContext) => Promise<any>
+export type Resolver = (ctx: ResolverContext) => Promise<ResolverResult[]>
+
+export interface ResolverData {
+  [key: string]: {
+    [key: string]: number
+  }
+}
+
+export interface ResolverResult {
+  id: string
+  timestamp: number
+  data: ResolverData
+}
 
 export interface GroupField {
   field: string
